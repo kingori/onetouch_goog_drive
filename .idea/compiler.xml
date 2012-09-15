@@ -6,6 +6,7 @@
       <directory url="file://$PROJECT_DIR$/main/gen" includeSubdirectories="true" />
       <directory url="file://$PROJECT_DIR$/lib_actionbar_sherlock/gen" includeSubdirectories="true" />
       <directory url="file://$PROJECT_DIR$/lib_holoeverywhere/gen" includeSubdirectories="true" />
+      <directory url="file://$PROJECT_DIR$/test/gen" includeSubdirectories="true" />
     </excludeFromCompile>
     <resourceExtensions />
     <wildcardResourcePatterns>

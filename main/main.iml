@@ -39,7 +39,6 @@
     <orderEntry type="sourceFolder" forTests="false" />
     <orderEntry type="module" module-name="lib_actionbar_sherlock" />
     <orderEntry type="module" module-name="lib_holoeverywhere" />
-    <orderEntry type="library" name="android-support-v4" level="application" />
     <orderEntry type="module-library">
       <library>
         <CLASSES>
@@ -96,7 +95,9 @@
           <root url="jar://$MODULE_DIR$/libs/guava-11.0.1.jar!/" />
           <root url="jar://$MODULE_DIR$/libs/jsr305-1.3.9.jar!/" />
         </CLASSES>
-        <JAVADOC />
+        <JAVADOC>
+          <root url="http://javadoc.google-api-java-client.googlecode.com/hg/apis/" />
+        </JAVADOC>
         <SOURCES>
           <root url="jar://$MODULE_DIR$/libs/jsr305-1.3.9.jar!/" />
         </SOURCES>
@@ -107,7 +108,9 @@
         <CLASSES>
           <root url="file://$MODULE_DIR$/libs" />
         </CLASSES>
-        <JAVADOC />
+        <JAVADOC>
+          <root url="http://javadoc.google-api-java-client.googlecode.com/hg/apis/" />
+        </JAVADOC>
         <SOURCES>
           <root url="file://$MODULE_DIR$/libs" />
         </SOURCES>
@@ -115,6 +118,7 @@
         <jarDirectory url="file://$MODULE_DIR$/libs" recursive="false" type="SOURCES" />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="android-support-v4" level="project" />
   </component>
 </module>
 

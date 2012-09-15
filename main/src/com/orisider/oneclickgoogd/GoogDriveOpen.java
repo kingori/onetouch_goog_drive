@@ -1,145 +1,141 @@
 package com.orisider.oneclickgoogd;
 
-import android.accounts.Account;
-import android.accounts.AccountManager;
-import android.accounts.AccountManagerCallback;
-import android.accounts.AccountManagerFuture;
+import android.app.Activity;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.util.Log;
 import com.github.rtyley.android.sherlock.roboguice.activity.RoboSherlockActivity;
-import com.google.api.client.auth.oauth.OAuthParameters;
-import com.google.api.client.auth.oauth2.Credential;
+import com.google.api.client.extensions.android.http.AndroidHttp;
 import com.google.api.client.extensions.android.json.AndroidJsonFactory;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
-import com.google.api.client.http.javanet.NetHttpTransport;
+import com.google.api.client.googleapis.services.GoogleKeyInitializer;
+import com.google.api.client.http.HttpTransport;
+import com.google.api.client.json.JsonFactory;
 import com.google.api.services.drive.Drive;
 import com.google.api.services.drive.model.File;
+import com.google.api.services.drive.model.Permission;
+import com.google.api.services.drive.model.PermissionList;
+import com.orisider.oneclickgoogd.model.AccessToken;
+import roboguice.util.RoboAsyncTask;
 
 import java.io.IOException;
 
 public class GoogDriveOpen extends RoboSherlockActivity {
 
-	/**
-	 * DRIVE_OPEN Intent action.
-	 */
-	private static final String ACTION_DRIVE_OPEN = "com.google.android.apps.drive.DRIVE_OPEN";
-	/**
-	 * Drive file ID key.
-	 */
-	private static final String EXTRA_FILE_ID = "resourceId";
+    /**
+     * Drive file ID.
+     */
+    private String mFileId;
 
-	/**
-	 * Drive file ID.
-	 */
-	private String mFileId;
-	private static final String LOG_TAG = "goog_drive_open";
+    /**
+     * Drive file ID key.
+     */
+    String EXTRA_FILE_ID = "resourceId";
 
+    Handler handler;
+    AccessToken token;
 
-	Handler handler;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (handler == null) {
+            handler = new Handler();
+        }
 
-	@Override
-	protected void onCreate(Bundle savedInstanceState) {
-		super.onCreate(savedInstanceState);
+        // Get the action that triggered the intent filter for this Activity
+        final Intent intent = getIntent();
+        final String action = intent.getAction();
 
-		handler = new Handler();
+        token = SessionStore.getAccountAuthToken();
 
-		// Get the action that triggered the intent filter for this Activity
-		final Intent intent = getIntent();
-		final String action = intent.getAction();
+        // Make sure the Action is DRIVE_OPEN.
+        if (Constant.ACTION_DRIVE_OPEN.equals(action)) {
+            // Get the Drive file ID.
+            mFileId = intent.getStringExtra(EXTRA_FILE_ID);
+            processFile();
+        } else {
+            Util.showToast(R.string.warn_no_file_found);
+            finish();
+        }
+    }
 
-		// Make sure the Action is DRIVE_OPEN.
-		if (ACTION_DRIVE_OPEN.equals(action)) {
-			// Get the Drive file ID.
-			mFileId = intent.getStringExtra(EXTRA_FILE_ID);
-			try {
-				getUserAccountAndProcessFile();
-			} catch (IOException e) {
-				e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-			}
-		} else {
-			// Unknown action.
-			finish();
-		}
-	}
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == Constant.REQ_CODE_ACNT && resultCode == Activity.RESULT_OK) {
+            token = (AccessToken) data.getSerializableExtra(Constant.BUNDLE_KEY_ACCESS_TOKEN);
+            if (token != null) {
+                processFile();
+            } else {
+                finish();
+            }
+        } else {
+            finish();
+        }
+    }
 
-	/**
-	 * Prompt the user to choose the account to use and process the file using the
-	 * Drive file ID stored in mFileId.
-	 */
-	private void getUserAccountAndProcessFile() throws IOException {
+    private void processFile() {
+        if (token == null) {
+            startActivityForResult(new Intent(this, GetAccountActivity.class), Constant.REQ_CODE_ACNT);
+            return;
+        }
 
-		final String AUTH_TOKEN_TYPE = "oauth2:https://www.googleapis.com/auth/drive";
+        final HttpTransport transport = AndroidHttp.newCompatibleTransport();
+        final JsonFactory jsonFactory = new AndroidJsonFactory();
+        GoogleCredential credential =
+                new GoogleCredential.Builder()
+                        .setClientSecrets(Constant.CLIENT_API_ID, Constant.CLIENT_API_SECRET).build();
 
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				final NetHttpTransport transport = new NetHttpTransport();
+        credential.setAccessToken(token.accessToken);
+        final Drive drive = new Drive.Builder(transport, jsonFactory, credential)
+                .setApplicationName("OneTouchGDrive")
+                .setJsonHttpRequestInitializer(new GoogleKeyInitializer(Constant.SIMPLE_API_KEY))
+                .build();
 
-				AccountManager acntMgr = AccountManager.get(getApplicationContext());
-				Account acnt = acntMgr.getAccounts()[4];
-				AccountManagerFuture<Bundle> oneTouchGDrive = acntMgr.getAuthToken(acnt, AUTH_TOKEN_TYPE, null, GoogDriveOpen.this, new AccountManagerCallback<Bundle>() {
-					@Override
-					public void run(AccountManagerFuture<Bundle> result) {
-//
-						Bundle bundle;
-						try {
-							bundle = result.getResult();
-							String authToken = bundle.getString(AccountManager.KEY_AUTHTOKEN);
+        new RoboAsyncTask<String>(this, handler){
 
-							Log.d(LOG_TAG, "auth token:" + authToken);
+            @Override
+            public String call() throws Exception {
 
-							Credential c = new GoogleCredential.Builder()
-									.setServiceAccountScopes("https://www.googleapis.com/auth/drive")
-									.setClientSecrets("445798695489.apps.googleusercontent.com", "3SYikZExgd0T2fg2QJsHTK_L").build();
-							c.setAccessToken(authToken);
+                try {
 
-							final Drive drive = new Drive.Builder(transport, new AndroidJsonFactory(), c).setApplicationName("OneTouchGDrive").build();
+                    PermissionList list = drive.permissions().list(mFileId).execute();
+                    for (Object v : list.values()) {
+                        Log.d(Constant.LOG_TAG, "perm item:" + v);
+                    }
 
-							new Thread(
-									new Runnable() {
-										@Override
-										public void run() {
-											File file = null;
-											try {
-												file = drive.files().get(mFileId).execute();
-												Log.d(LOG_TAG, "title:" + file.getTitle());
-												Log.d(LOG_TAG, "download url:" + file.getDownloadUrl());
-												Log.d(LOG_TAG, "kind:" + file.getKind());
-											} catch (IOException e) {
-												e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-											}
+                    Permission anyoneReadPerm = new Permission();
+                    //anyoneReadPerm.setValue("anyone");
+                    anyoneReadPerm.setType("anyone");
+                    anyoneReadPerm.setRole("reader");
+                    drive.permissions().insert(mFileId, anyoneReadPerm).execute();
 
-										}
-									}
+                    File file = drive.files().get(mFileId).execute();
+                    Log.d(Constant.LOG_TAG, "title:" + file.getTitle());
+                    Log.d(Constant.LOG_TAG, "download url:" + file.getDownloadUrl());
+                    Log.d(Constant.LOG_TAG, "kind:" + file.getKind());
+                    Log.d(Constant.LOG_TAG, "web content link:" + file.getWebContentLink());
 
+                    return file.getWebContentLink();
+                } catch (IOException e) {
+                    Log.w(Constant.LOG_TAG, "failed to get file", e);
+                    return null;
+                }
+            }
 
-							).start();
+            @Override
+            protected void onSuccess(String shareUrl) throws Exception {
+                Util.showToast("url:"+shareUrl);
+            }
 
-
-						} catch (Throwable e) {
-							e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-						}
-
-
-					}
-				}, handler);
-
-
-			}
-		}).start();
-
-
-//		AccountManager acntMgr = AccountManager.get(getApplicationContext());
-//
-//		Account acnt =  acntMgr.getAccounts()[0];
-//		Log.d(LOG_TAG, "acnt name:" +acnt.name );
-//		acntMgr.getAuthToken(acnt, )
+            @Override
+            protected void onThrowable(Throwable t) throws RuntimeException {
+                Util.showToast("failed:"+t);
+            }
+        }.execute();
 
 
-//		// Implement the method.
-//		throw new UnsupportedOperationException(
-//				"The getUserAccountAndProcessFile method has not been implemented");
-	}
+    }
+
 }
